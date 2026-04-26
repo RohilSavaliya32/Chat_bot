@@ -15,6 +15,7 @@ const server = http.createServer(app);
 // 🔥 Socket Setup
 const io = new Server(server, {
   path: "/socket.io/",
+  transports: ["websocket", "polling"],
   cors: {
     origin: "*",
     methods: ["GET", "POST"],
