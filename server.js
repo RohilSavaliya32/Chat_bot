@@ -10,26 +10,25 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🌐 Create HTTP server
 const server = http.createServer(app);
 
-// 🔌 Socket setup
+// 🔥 Socket Setup (FIXED PATH)
 const io = new Server(server, {
+  path: "/socket.io/",
   cors: {
     origin: "*",
     methods: ["GET", "POST"],
   },
 });
 
-// 🧠 User Mapping
 let users = {};
 
-// 📦 MongoDB Connection (optional)
+// MongoDB
 mongoose.connect(process.env.MONGO_URL)
-  .then(() => console.log("MongoDB Connected"))
-  .catch((err) => console.log(err));
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch((err) => console.log("❌ DB Error:", err));
 
-// 📄 Message Schema
+// Schema
 const messageSchema = new mongoose.Schema({
   senderId: String,
   receiverId: String,
@@ -39,42 +38,30 @@ const messageSchema = new mongoose.Schema({
 
 const Message = mongoose.model("Message", messageSchema);
 
-// 🔌 Socket Connection
+// Socket
 io.on("connection", (socket) => {
-  console.log("User Connected:", socket.id);
+  console.log("🔥 User Connected:", socket.id);
 
-  // 🟢 Register User
   socket.on("register", (userId) => {
     users[userId] = socket.id;
-    console.log("Users:", users);
+    console.log("👤 Users:", users);
   });
 
-  // 💬 Send Message
   socket.on("send_message", async (data) => {
     const { senderId, receiverId, message } = data;
 
-    // Save to DB
     const newMsg = new Message({ senderId, receiverId, message });
     await newMsg.save();
 
-    // Send to receiver
     const receiverSocket = users[receiverId];
+
     if (receiverSocket) {
       io.to(receiverSocket).emit("receive_message", data);
     }
   });
 
-  // ⌨️ Typing Indicator
-  socket.on("typing", (data) => {
-    const receiverSocket = users[data.receiverId];
-    if (receiverSocket) {
-      io.to(receiverSocket).emit("typing", data);
-    }
-  });
-
-  // ❌ Disconnect
   socket.on("disconnect", () => {
-    console.log("User Disconnected:", socket.id);
+    console.log("❌ User Disconnected:", socket.id);
 
     for (let userId in users) {
       if (users[userId] === socket.id) {
@@ -84,28 +71,13 @@ io.on("connection", (socket) => {
   });
 });
 
-// 🌐 API (Chat History)
-app.get("/messages/:senderId/:receiverId", async (req, res) => {
-  const { senderId, receiverId } = req.params;
-
-  const messages = await Message.find({
-    $or: [
-      { senderId, receiverId },
-      { senderId: receiverId, receiverId: senderId },
-    ],
-  }).sort({ time: 1 });
-
-  res.json(messages);
-});
-
-// 🟢 Root API
+// API
 app.get("/", (req, res) => {
   res.send("Server is running 🚀");
 });
 
-// 🔥 Port for Render
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
