@@ -12,7 +12,7 @@ app.use(express.json());
 
 const server = http.createServer(app);
 
-// 🔥 Socket Setup (FIXED PATH)
+// 🔥 Socket Setup
 const io = new Server(server, {
   path: "/socket.io/",
   cors: {
@@ -23,12 +23,12 @@ const io = new Server(server, {
 
 let users = {};
 
-// MongoDB
+// ✅ MongoDB Connect
 mongoose.connect(process.env.MONGO_URL)
   .then(() => console.log("✅ MongoDB Connected"))
   .catch((err) => console.log("❌ DB Error:", err));
 
-// Schema
+// ✅ Schema
 const messageSchema = new mongoose.Schema({
   senderId: String,
   receiverId: String,
@@ -38,28 +38,45 @@ const messageSchema = new mongoose.Schema({
 
 const Message = mongoose.model("Message", messageSchema);
 
-// Socket
+// 🔥 SOCKET LOGIC
 io.on("connection", (socket) => {
   console.log("🔥 User Connected:", socket.id);
 
+  // ✅ Register user
   socket.on("register", (userId) => {
     users[userId] = socket.id;
     console.log("👤 Users:", users);
   });
 
+  // ✅ Send Message
   socket.on("send_message", async (data) => {
-    const { senderId, receiverId, message } = data;
+    console.log("📩 Incoming:", data);
 
-    const newMsg = new Message({ senderId, receiverId, message });
-    await newMsg.save();
+    const { senderId, receiverId, message } = data;
 
     const receiverSocket = users[receiverId];
 
+    console.log("👉 Receiver Socket:", receiverSocket);
+
+    // 🔥 Send instantly (REAL TIME)
     if (receiverSocket) {
       io.to(receiverSocket).emit("receive_message", data);
+      console.log("✅ Message delivered");
+    } else {
+      console.log("📦 User offline, saved only");
+    }
+
+    // 🔥 Save to DB (safe)
+    try {
+      const newMsg = new Message({ senderId, receiverId, message });
+      await newMsg.save();
+      console.log("💾 Saved to DB");
+    } catch (err) {
+      console.log("❌ DB Error:", err);
     }
   });
 
+  // ❌ Disconnect
   socket.on("disconnect", () => {
     console.log("❌ User Disconnected:", socket.id);
 
@@ -71,7 +88,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// API
+// 🌐 Test API
 app.get("/", (req, res) => {
   res.send("Server is running 🚀");
 });
